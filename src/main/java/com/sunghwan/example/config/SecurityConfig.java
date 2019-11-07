@@ -4,11 +4,16 @@ import com.sunghwan.example.user.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.session.web.http.HeaderHttpSessionStrategy;
+import org.springframework.session.web.http.HttpSessionStrategy;
 
 @Configuration
 public class SecurityConfig extends WebSecurityConfigurerAdapter {
@@ -26,14 +31,27 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
         http
                 //. csrf().disable() : 이건 csrf(Cross Site Request Forgery)를 기본적으로 요청하는데, 이것을 하기 위해서는 따로 처리하는게 필요하므로 일단은 disable 처리합니다.
                 .csrf().disable()
+                // 사용자의 쿠키에 세션을 저장하지 않겠다는 옵션. Rest 아키텍쳐는 Stateless를 조건으로 하기 때문에 세션정책을 STATELESS로.
+                .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                    .and()
                 //요청에 대해서 권한 처리를 하겠다.
                 .authorizeRequests()
+                    //로그인 로직 커스터마이징
+                    .antMatchers("/user/login").permitAll()
+                    /*
+                        크롬과 같은 브라우저에서는 실제 GET, POST 요청을 하기 전에 OPTIONS를 preflight 요청합니다.
+                        이는 실제 서버가 살아있는지를 사전에 확인하는 요청입니다.
+                        Spring에서는 OPTIONS에 대한 요청을 막고 있으므로
+                        해당 코드를 통해서 OPTIONS 요청이 왔을 때도 오류를 리턴하지 않도록 해줍니다.
+                     */
+                    .antMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                     .antMatchers("/user").hasAuthority("USER")
                     .antMatchers("/admin").hasAuthority("ADMIN")
                     //어떠한 요청에라도 인증을 요구하겠다.
-                    .anyRequest().authenticated()
+                    .anyRequest().permitAll()
                     .and()
-                .formLogin() //Form을 이용한 로그인을 사용하겠다.
+
+                .formLogin().and() //Form을 이용한 로그인을 사용하겠다. -> 안쓰면 커스터마이징
                     // 추가메소드
                     /*
                         successHandler
@@ -51,7 +69,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
                      */
 
-                    .and()
+
                 .logout();
                     //추가 메소드
                     /*
@@ -68,6 +86,17 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 //커스터마이징한 UserService를 적용하기 위해.
                 .userDetailsService(userService)
                 .passwordEncoder(passwordEncoder());
+    }
+
+    @Bean
+    @Override
+    public AuthenticationManager authenticationManagerBean() throws Exception{
+        return super.authenticationManagerBean();
+    }
+
+    @Bean
+    public HttpSessionStrategy httpSessionStrategy(){
+        return new HeaderHttpSessionStrategy();
     }
 
 }

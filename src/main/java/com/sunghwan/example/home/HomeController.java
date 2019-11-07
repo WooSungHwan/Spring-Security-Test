@@ -14,7 +14,7 @@ public class HomeController {
     @Autowired
     private HomeMapper homeMapper;
 
-    @GetMapping("/")
+    @RequestMapping("/")
     public String home(){
         return "Hello World";
     }
